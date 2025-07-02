@@ -1,361 +1,490 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Plus, Trash2, Save, Eye, EyeOff, LogOut, BarChart3, Users, Coins, TrendingUp, Shield } from 'lucide-react';
-import { WhitelistToken } from '../types';
+import { Plus, Trash2, Save, Settings, Users, Database, AlertCircle, CheckCircle, X } from 'lucide-react';
 import { airdropService } from '../services/airdrop';
 import { ethplorerService } from '../services/ethplorer';
 import { databaseService } from '../services/database';
-import { useAuth } from '../hooks/useAuth';
+
+interface Token {
+  id: string;
+  address: string;
+  name: string;
+  symbol: string;
+  airdrop_amount: number;
+  is_active: boolean;
+}
+
+interface Claim {
+  id: string;
+  wallet_address: string;
+  tokens_claimed: any[];
+  total_amount: number;
+  status: string;
+  created_at: string;
+}
+
+interface NotificationProps {
+  type: 'success' | 'error';
+  message: string;
+  onClose: () => void;
+}
+
+const Notification: React.FC<NotificationProps> = ({ type, message, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg border ${
+      type === 'success' 
+        ? 'bg-green-500/10 border-green-500/20 text-green-400' 
+        : 'bg-red-500/10 border-red-500/20 text-red-400'
+    } backdrop-blur-sm`}>
+      <div className="flex items-center gap-3">
+        {type === 'success' ? (
+          <CheckCircle className="w-5 h-5 flex-shrink-0" />
+        ) : (
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+        )}
+        <span className="text-sm">{message}</span>
+        <button
+          onClick={onClose}
+          className="ml-2 hover:opacity-70 transition-opacity"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const AdminPanel: React.FC = () => {
-  const { signOut, user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'whitelist' | 'settings' | 'analytics'>('whitelist');
-  const [whitelist, setWhitelist] = useState<WhitelistToken[]>([]);
-  const [apiKey, setApiKey] = useState('freekey');
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [statistics, setStatistics] = useState<any>({});
+  const [activeTab, setActiveTab] = useState<'tokens' | 'claims' | 'settings'>('tokens');
+  const [tokens, setTokens] = useState<Token[]>([]);
+  const [claims, setClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newToken, setNewToken] = useState<Partial<WhitelistToken>>({
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Token form state
+  const [newToken, setNewToken] = useState({
     address: '',
     name: '',
     symbol: '',
-    airdrop_amount: 0,
-    is_active: true,
+    airdrop_amount: 0
   });
 
-  const backgroundPattern = "data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E";
+  // Settings state
+  const [apiKey, setApiKey] = useState('');
+  const [platformName, setPlatformName] = useState('');
+  const [maxClaims, setMaxClaims] = useState('');
+  const [airdropEnabled, setAirdropEnabled] = useState(true);
+
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+  };
 
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
-    setLoading(true);
     try {
-      const [whitelistData, savedApiKey, stats] = await Promise.all([
-        airdropService.getWhitelist(),
-        databaseService.getSetting('ethplorer_api_key'),
-        databaseService.getStatistics(),
+      setLoading(true);
+      const [tokensData, claimsData] = await Promise.all([
+        airdropService.getWhitelistTokens(),
+        databaseService.getClaims()
       ]);
-
-      setWhitelist(whitelistData);
-      if (savedApiKey) setApiKey(savedApiKey);
-      setStatistics(stats);
+      
+      setTokens(tokensData);
+      setClaims(claimsData);
+      
+      // Load settings
+      const settings = await databaseService.getSettings();
+      setApiKey(settings.ethplorer_api_key || '');
+      setPlatformName(settings.platform_name || '');
+      setMaxClaims(settings.max_claims_per_address || '');
+      setAirdropEnabled(settings.airdrop_enabled === 'true');
     } catch (error) {
       console.error('Error loading data:', error);
+      showNotification('error', 'Failed to load data');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddToken = async () => {
-    if (newToken.address && newToken.name && newToken.symbol && newToken.airdrop_amount) {
-      const success = await airdropService.addToWhitelist({
-        address: newToken.address,
-        name: newToken.name,
-        symbol: newToken.symbol,
-        airdrop_amount: newToken.airdrop_amount,
-        is_active: newToken.is_active || true,
-      });
-
-      if (success) {
-        await loadData();
-        setNewToken({
-          address: '',
-          name: '',
-          symbol: '',
-          airdrop_amount: 0,
-          is_active: true,
-        });
-      }
+  const handleAddToken = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await airdropService.addToWhitelist(
+        newToken.address,
+        newToken.name,
+        newToken.symbol,
+        newToken.airdrop_amount
+      );
+      
+      setNewToken({ address: '', name: '', symbol: '', airdrop_amount: 0 });
+      await loadData();
+      showNotification('success', 'Token successfully added to whitelist');
+    } catch (error) {
+      console.error('Error adding token:', error);
+      showNotification('error', 'Failed to add token to whitelist');
     }
   };
 
-  const handleRemoveToken = async (id: string) => {
-    const success = await airdropService.removeFromWhitelist(id);
-    if (success) {
+  const handleRemoveToken = async (tokenId: string) => {
+    try {
+      await airdropService.removeFromWhitelist(tokenId);
       await loadData();
+      showNotification('success', 'Token successfully removed from whitelist');
+    } catch (error) {
+      console.error('Error removing token:', error);
+      showNotification('error', 'Failed to remove token from whitelist');
     }
   };
 
-  const handleToggleToken = async (id: string, currentStatus: boolean) => {
-    const success = await airdropService.updateWhitelistToken(id, {
-      is_active: !currentStatus,
-    });
-    if (success) {
+  const handleToggleToken = async (tokenId: string, isActive: boolean) => {
+    try {
+      await databaseService.updateToken(tokenId, { is_active: !isActive });
       await loadData();
+      showNotification('success', `Token ${!isActive ? 'activated' : 'deactivated'} successfully`);
+    } catch (error) {
+      console.error('Error toggling token:', error);
+      showNotification('error', 'Failed to update token status');
     }
   };
 
   const handleSaveApiKey = async () => {
-    await ethplorerService.setApiKey(apiKey);
-    alert('API key updated successfully!');
+    try {
+      await ethplorerService.setApiKey(apiKey);
+      showNotification('success', 'API key saved successfully');
+    } catch (error) {
+      console.error('Error saving API key:', error);
+      showNotification('error', 'Failed to save API key');
+    }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
+  const handleSaveSettings = async () => {
+    try {
+      await Promise.all([
+        databaseService.setSetting('platform_name', platformName),
+        databaseService.setSetting('max_claims_per_address', maxClaims),
+        databaseService.setSetting('airdrop_enabled', airdropEnabled.toString())
+      ]);
+      showNotification('success', 'Settings saved successfully');
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      showNotification('error', 'Failed to save settings');
+    }
   };
+
+  const renderTokensTab = () => (
+    <div className="space-y-6">
+      {/* Add Token Form */}
+      <div className="bg-gray-700/30 rounded-xl p-6 border border-gray-600/30">
+        <h3 className="text-lg font-semibold text-white mb-4">Add New Token</h3>
+        <form onSubmit={handleAddToken} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <input
+            type="text"
+            placeholder="Token Address"
+            value={newToken.address}
+            onChange={(e) => setNewToken({ ...newToken, address: e.target.value })}
+            className="bg-gray-800/50 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:border-purple-500 focus:outline-none"
+            required
+          />
+          <input
+            type="text"
+            placeholder="Token Name"
+            value={newToken.name}
+            onChange={(e) => setNewToken({ ...newToken, name: e.target.value })}
+            className="bg-gray-800/50 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:border-purple-500 focus:outline-none"
+            required
+          />
+          <input
+            type="text"
+            placeholder="Symbol"
+            value={newToken.symbol}
+            onChange={(e) => setNewToken({ ...newToken, symbol: e.target.value })}
+            className="bg-gray-800/50 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:border-purple-500 focus:outline-none"
+            required
+          />
+          <input
+            type="number"
+            placeholder="Airdrop Amount"
+            value={newToken.airdrop_amount}
+            onChange={(e) => setNewToken({ ...newToken, airdrop_amount: parseInt(e.target.value) || 0 })}
+            className="bg-gray-800/50 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:border-purple-500 focus:outline-none"
+            required
+          />
+          <button
+            type="submit"
+            className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all flex items-center justify-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Add Token
+          </button>
+        </form>
+      </div>
+
+      {/* Tokens List */}
+      <div className="bg-gray-700/30 rounded-xl border border-gray-600/30 overflow-hidden">
+        <div className="p-6 border-b border-gray-600/30">
+          <h3 className="text-lg font-semibold text-white">Whitelist Tokens</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-800/50">
+              <tr>
+                <th className="text-left p-4 text-gray-300 font-medium">Token</th>
+                <th className="text-left p-4 text-gray-300 font-medium">Address</th>
+                <th className="text-left p-4 text-gray-300 font-medium">Airdrop Amount</th>
+                <th className="text-left p-4 text-gray-300 font-medium">Status</th>
+                <th className="text-left p-4 text-gray-300 font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tokens.map((token) => (
+                <tr key={token.id} className="border-t border-gray-600/30">
+                  <td className="p-4">
+                    <div>
+                      <div className="text-white font-medium">{token.name}</div>
+                      <div className="text-gray-400 text-sm">{token.symbol}</div>
+                    </div>
+                  </td>
+                  <td className="p-4 text-gray-300 font-mono text-sm">
+                    {token.address.slice(0, 10)}...{token.address.slice(-8)}
+                  </td>
+                  <td className="p-4 text-gray-300">{token.airdrop_amount.toLocaleString()}</td>
+                  <td className="p-4">
+                    <button
+                      onClick={() => handleToggleToken(token.id, token.is_active)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        token.is_active
+                          ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                          : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                      }`}
+                    >
+                      {token.is_active ? 'Active' : 'Inactive'}
+                    </button>
+                  </td>
+                  <td className="p-4">
+                    <button
+                      onClick={() => handleRemoveToken(token.id)}
+                      className="text-red-400 hover:text-red-300 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderClaimsTab = () => (
+    <div className="bg-gray-700/30 rounded-xl border border-gray-600/30 overflow-hidden">
+      <div className="p-6 border-b border-gray-600/30">
+        <h3 className="text-lg font-semibold text-white">Airdrop Claims</h3>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-gray-800/50">
+            <tr>
+              <th className="text-left p-4 text-gray-300 font-medium">Wallet Address</th>
+              <th className="text-left p-4 text-gray-300 font-medium">Tokens Claimed</th>
+              <th className="text-left p-4 text-gray-300 font-medium">Total Amount</th>
+              <th className="text-left p-4 text-gray-300 font-medium">Status</th>
+              <th className="text-left p-4 text-gray-300 font-medium">Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {claims.map((claim) => (
+              <tr key={claim.id} className="border-t border-gray-600/30">
+                <td className="p-4 text-gray-300 font-mono text-sm">
+                  {claim.wallet_address.slice(0, 10)}...{claim.wallet_address.slice(-8)}
+                </td>
+                <td className="p-4 text-gray-300">{claim.tokens_claimed.length}</td>
+                <td className="p-4 text-gray-300">{claim.total_amount.toLocaleString()}</td>
+                <td className="p-4">
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    claim.status === 'completed'
+                      ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                      : claim.status === 'pending'
+                      ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                      : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                  }`}>
+                    {claim.status}
+                  </span>
+                </td>
+                <td className="p-4 text-gray-400 text-sm">
+                  {new Date(claim.created_at).toLocaleDateString()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  const renderSettingsTab = () => (
+    <div className="space-y-6">
+      {/* API Settings */}
+      <div className="bg-gray-700/30 rounded-xl p-6 border border-gray-600/30">
+        <h3 className="text-lg font-semibold text-white mb-4">API Settings</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-gray-300 text-sm font-medium mb-2">
+              Ethplorer API Key
+            </label>
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                className="flex-1 bg-gray-800/50 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:border-purple-500 focus:outline-none"
+                placeholder="Enter your Ethplorer API key"
+              />
+              <button
+                onClick={handleSaveApiKey}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all flex items-center gap-2"
+              >
+                <Save className="w-4 h-4" />
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Platform Settings */}
+      <div className="bg-gray-700/30 rounded-xl p-6 border border-gray-600/30">
+        <h3 className="text-lg font-semibold text-white mb-4">Platform Settings</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-gray-300 text-sm font-medium mb-2">
+              Platform Name
+            </label>
+            <input
+              type="text"
+              value={platformName}
+              onChange={(e) => setPlatformName(e.target.value)}
+              className="w-full bg-gray-800/50 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:border-purple-500 focus:outline-none"
+              placeholder="Enter platform name"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-gray-300 text-sm font-medium mb-2">
+              Max Claims Per Address
+            </label>
+            <input
+              type="number"
+              value={maxClaims}
+              onChange={(e) => setMaxClaims(e.target.value)}
+              className="w-full bg-gray-800/50 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:border-purple-500 focus:outline-none"
+              placeholder="Enter max claims per address"
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="airdropEnabled"
+              checked={airdropEnabled}
+              onChange={(e) => setAirdropEnabled(e.target.checked)}
+              className="w-4 h-4 text-purple-600 bg-gray-800 border-gray-600 rounded focus:ring-purple-500"
+            />
+            <label htmlFor="airdropEnabled" className="text-gray-300 text-sm font-medium">
+              Enable Airdrop Claims
+            </label>
+          </div>
+
+          <button
+            onClick={handleSaveSettings}
+            className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all flex items-center gap-2"
+          >
+            <Save className="w-4 h-4" />
+            Save Settings
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+        <div className="text-white">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
-      <div 
-        className="absolute inset-0 opacity-20"
-        style={{ backgroundImage: `url("${backgroundPattern}")` }}
-      ></div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-4">
+      {notification && (
+        <Notification
+          type={notification.type}
+          message={notification.message}
+          onClose={() => setNotification(null)}
+        />
+      )}
       
-      <div className="relative max-w-7xl mx-auto p-6">
-        <div className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl shadow-2xl">
+      <div className="max-w-7xl mx-auto">
+        <div className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl overflow-hidden shadow-2xl">
+          {/* Header */}
           <div className="p-6 border-b border-gray-700/50">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/25">
-                  <Settings className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-white">Admin Panel</h1>
-                  <p className="text-gray-400">
-                    Welcome, {user?.username} • Role: {user?.role}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={handleSignOut}
-                className="flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-400 rounded-xl hover:bg-red-500/30 transition-colors"
-              >
-                <LogOut className="w-4 h-4" />
-                Sign Out
-              </button>
-            </div>
-
-            {/* Tab Navigation */}
-            <div className="flex space-x-1 bg-gray-700/50 rounded-xl p-1">
-              <button
-                onClick={() => setActiveTab('whitelist')}
-                className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  activeTab === 'whitelist'
-                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/25'
-                    : 'text-gray-400 hover:text-gray-300'
-                }`}
-              >
-                Whitelist Management
-              </button>
-              <button
-                onClick={() => setActiveTab('settings')}
-                className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  activeTab === 'settings'
-                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/25'
-                    : 'text-gray-400 hover:text-gray-300'
-                }`}
-              >
-                API Settings
-              </button>
-              <button
-                onClick={() => setActiveTab('analytics')}
-                className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  activeTab === 'analytics'
-                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/25'
-                    : 'text-gray-400 hover:text-gray-300'
-                }`}
-              >
-                Analytics
-              </button>
-            </div>
+            <h1 className="text-2xl font-bold text-white">Admin Panel</h1>
+            <p className="text-gray-400 mt-1">Manage your airdrop platform</p>
           </div>
 
+          {/* Tabs */}
+          <div className="flex border-b border-gray-700/50">
+            <button
+              onClick={() => setActiveTab('tokens')}
+              className={`flex items-center gap-2 px-6 py-4 font-medium transition-colors ${
+                activeTab === 'tokens'
+                  ? 'text-purple-400 border-b-2 border-purple-400 bg-purple-500/10'
+                  : 'text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              <Database className="w-4 h-4" />
+              Tokens
+            </button>
+            <button
+              onClick={() => setActiveTab('claims')}
+              className={`flex items-center gap-2 px-6 py-4 font-medium transition-colors ${
+                activeTab === 'claims'
+                  ? 'text-purple-400 border-b-2 border-purple-400 bg-purple-500/10'
+                  : 'text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Claims
+            </button>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`flex items-center gap-2 px-6 py-4 font-medium transition-colors ${
+                activeTab === 'settings'
+                  ? 'text-purple-400 border-b-2 border-purple-400 bg-purple-500/10'
+                  : 'text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              <Settings className="w-4 h-4" />
+              Settings
+            </button>
+          </div>
+
+          {/* Content */}
           <div className="p-6">
-            {activeTab === 'whitelist' && (
-              <div className="space-y-6">
-                {/* Add New Token Form */}
-                <div className="bg-gray-700/30 rounded-xl p-6 border border-gray-600/30">
-                  <h3 className="font-semibold text-white mb-4">Add New Token</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                    <input
-                      type="text"
-                      placeholder="Token Address"
-                      value={newToken.address || ''}
-                      onChange={(e) => setNewToken({ ...newToken, address: e.target.value })}
-                      className="px-3 py-2 bg-gray-600/50 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Token Name"
-                      value={newToken.name || ''}
-                      onChange={(e) => setNewToken({ ...newToken, name: e.target.value })}
-                      className="px-3 py-2 bg-gray-600/50 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Symbol"
-                      value={newToken.symbol || ''}
-                      onChange={(e) => setNewToken({ ...newToken, symbol: e.target.value.toUpperCase() })}
-                      className="px-3 py-2 bg-gray-600/50 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Airdrop Amount"
-                      value={newToken.airdrop_amount || ''}
-                      onChange={(e) => setNewToken({ ...newToken, airdrop_amount: parseInt(e.target.value) || 0 })}
-                      className="px-3 py-2 bg-gray-600/50 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                    />
-                  </div>
-                  <button
-                    onClick={handleAddToken}
-                    disabled={!newToken.address || !newToken.name || !newToken.symbol || !newToken.airdrop_amount}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-purple-500/25"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Token
-                  </button>
-                </div>
-
-                {/* Whitelist Table */}
-                <div>
-                  <h3 className="font-semibold text-white mb-4">Current Whitelist ({whitelist.length} tokens)</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="border-b border-gray-700">
-                          <th className="text-left py-3 px-4 font-semibold text-gray-300">Token</th>
-                          <th className="text-left py-3 px-4 font-semibold text-gray-300">Address</th>
-                          <th className="text-left py-3 px-4 font-semibold text-gray-300">Airdrop Amount</th>
-                          <th className="text-left py-3 px-4 font-semibold text-gray-300">Status</th>
-                          <th className="text-left py-3 px-4 font-semibold text-gray-300">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {whitelist.map((token) => (
-                          <tr key={token.id} className="border-b border-gray-700/50 hover:bg-gray-700/20">
-                            <td className="py-3 px-4">
-                              <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-full flex items-center justify-center">
-                                  <span className="text-white font-bold text-xs">
-                                    {token.symbol.slice(0, 2)}
-                                  </span>
-                                </div>
-                                <div>
-                                  <p className="font-medium text-white">{token.name}</p>
-                                  <p className="text-sm text-gray-400">{token.symbol}</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-3 px-4">
-                              <code className="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded">
-                                {token.address.slice(0, 8)}...{token.address.slice(-6)}
-                              </code>
-                            </td>
-                            <td className="py-3 px-4">
-                              <span className="font-semibold text-emerald-400">
-                                {token.airdrop_amount.toLocaleString()}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4">
-                              <button
-                                onClick={() => handleToggleToken(token.id!, token.is_active)}
-                                className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                  token.is_active
-                                    ? 'bg-emerald-500/20 text-emerald-400'
-                                    : 'bg-gray-500/20 text-gray-400'
-                                }`}
-                              >
-                                {token.is_active ? 'Active' : 'Inactive'}
-                              </button>
-                            </td>
-                            <td className="py-3 px-4">
-                              <button
-                                onClick={() => handleRemoveToken(token.id!)}
-                                className="text-red-400 hover:text-red-300 p-1 rounded transition-colors"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'settings' && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="font-semibold text-white mb-4">Ethplorer API Configuration</h3>
-                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-4">
-                    <p className="text-sm text-yellow-400">
-                      <strong>Note:</strong> The free API key has rate limits. Consider upgrading to a paid plan for production use.
-                    </p>
-                  </div>
-                  <div className="flex gap-4">
-                    <div className="flex-1 relative">
-                      <input
-                        type={showApiKey ? 'text' : 'password'}
-                        value={apiKey}
-                        onChange={(e) => setApiKey(e.target.value)}
-                        placeholder="Enter Ethplorer API Key"
-                        className="w-full px-3 py-2 pr-10 bg-gray-600/50 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                      />
-                      <button
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
-                      >
-                        {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    <button
-                      onClick={handleSaveApiKey}
-                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all shadow-lg shadow-purple-500/25"
-                    >
-                      <Save className="w-4 h-4" />
-                      Save
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'analytics' && (
-              <div className="space-y-6">
-                <h3 className="font-semibold text-white mb-4">Platform Analytics</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/30 rounded-xl p-4">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Users className="w-5 h-5 text-blue-400" />
-                      <p className="text-sm text-blue-400 font-medium">Total Claims</p>
-                    </div>
-                    <p className="text-2xl font-bold text-white">{statistics.totalClaims || 0}</p>
-                  </div>
-                  <div className="bg-gradient-to-br from-emerald-500/20 to-green-500/20 border border-emerald-500/30 rounded-xl p-4">
-                    <div className="flex items-center gap-3 mb-2">
-                      <BarChart3 className="w-5 h-5 text-emerald-400" />
-                      <p className="text-sm text-emerald-400 font-medium">Completed Claims</p>
-                    </div>
-                    <p className="text-2xl font-bold text-white">{statistics.completedClaims || 0}</p>
-                  </div>
-                  <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-xl p-4">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Coins className="w-5 h-5 text-purple-400" />
-                      <p className="text-sm text-purple-400 font-medium">Active Tokens</p>
-                    </div>
-                    <p className="text-2xl font-bold text-white">{statistics.activeTokens || 0}</p>
-                  </div>
-                  <div className="bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-500/30 rounded-xl p-4">
-                    <div className="flex items-center gap-3 mb-2">
-                      <TrendingUp className="w-5 h-5 text-orange-400" />
-                      <p className="text-sm text-orange-400 font-medium">Total Distributed</p>
-                    </div>
-                    <p className="text-2xl font-bold text-white">{(statistics.totalDistributed || 0).toLocaleString()}</p>
-                  </div>
-                </div>
-              </div>
-            )}
+            {activeTab === 'tokens' && renderTokensTab()}
+            {activeTab === 'claims' && renderClaimsTab()}
+            {activeTab === 'settings' && renderSettingsTab()}
           </div>
         </div>
       </div>

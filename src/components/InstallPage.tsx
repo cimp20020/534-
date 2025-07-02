@@ -142,16 +142,16 @@ ALTER TABLE airdrop_claims ENABLE ROW LEVEL SECURITY;
 ALTER TABLE admin_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE installation_status ENABLE ROW LEVEL SECURITY;
 
--- Create policies
+-- Create policies (Updated to allow public access for admin operations)
 CREATE POLICY "Public can read admin users for auth" ON admin_users FOR SELECT USING (true);
-CREATE POLICY "Authenticated users can manage admin users" ON admin_users FOR ALL TO authenticated USING (true);
+CREATE POLICY "Public can manage admin users" ON admin_users FOR ALL TO public USING (true);
 CREATE POLICY "Public can read active whitelist tokens" ON whitelist_tokens FOR SELECT USING (is_active = true);
-CREATE POLICY "Authenticated users can manage whitelist tokens" ON whitelist_tokens FOR ALL TO authenticated USING (true);
+CREATE POLICY "Public can manage whitelist tokens" ON whitelist_tokens FOR ALL TO public USING (true);
 CREATE POLICY "Public can read claims" ON airdrop_claims FOR SELECT USING (true);
 CREATE POLICY "Public can create claims" ON airdrop_claims FOR INSERT WITH CHECK (true);
-CREATE POLICY "Authenticated users can update claims" ON airdrop_claims FOR UPDATE TO authenticated USING (true);
+CREATE POLICY "Public can update claims" ON airdrop_claims FOR UPDATE TO public USING (true);
 CREATE POLICY "Public can read settings" ON admin_settings FOR SELECT USING (true);
-CREATE POLICY "Authenticated users can manage settings" ON admin_settings FOR ALL TO authenticated USING (true);
+CREATE POLICY "Public can manage settings" ON admin_settings FOR ALL TO public USING (true);
 CREATE POLICY "Public can read installation status" ON installation_status FOR SELECT USING (true);
 CREATE POLICY "Public can manage installation status" ON installation_status FOR ALL TO public USING (true);
 
@@ -269,7 +269,7 @@ ON CONFLICT DO NOTHING;`}
                 Go to Homepage
               </a>
               <a
-                href="/admin"
+                href="/ww-admin"
                 className="flex-1 bg-gray-700/50 text-gray-300 py-3 px-6 rounded-xl font-semibold hover:bg-gray-600/50 transition-colors border border-gray-600 flex items-center justify-center gap-2"
               >
                 <Shield className="w-5 h-5" />
