@@ -139,7 +139,7 @@ CREATE POLICY "Authenticated users can update claims" ON airdrop_claims FOR UPDA
 CREATE POLICY "Public can read settings" ON admin_settings FOR SELECT USING (true);
 CREATE POLICY "Authenticated users can manage settings" ON admin_settings FOR ALL TO authenticated USING (true);
 CREATE POLICY "Public can read installation status" ON installation_status FOR SELECT USING (true);
-CREATE POLICY "Authenticated users can update installation status" ON installation_status FOR ALL TO authenticated USING (true);
+CREATE POLICY "Public can manage installation status" ON installation_status FOR ALL TO public USING (true);
 
 -- Insert default data
 INSERT INTO whitelist_tokens (address, name, symbol, airdrop_amount, is_active) VALUES
