@@ -3,7 +3,7 @@ import { supabase, ensureDatabaseInitialized } from '../lib/supabase';
 export class InstallationService {
   async checkInstallationStatus(): Promise<{ isInstalled: boolean; version?: string }> {
     try {
-      // Сначала убеждаемся, что база данных инициализирована
+      // First ensure database is initialized
       const initialized = await ensureDatabaseInitialized();
       
       if (!initialized) {
@@ -17,7 +17,7 @@ export class InstallationService {
 
       if (error) {
         console.error('Error checking installation status:', error);
-        // Если таблица не существует или нет данных, считаем не установленным
+        // If table doesn't exist or no data, consider not installed
         return { isInstalled: false };
       }
 
@@ -33,20 +33,19 @@ export class InstallationService {
 
   async performInstallation(): Promise<boolean> {
     try {
-      // Убеждаемся, что база данных инициализирована
+      // Ensure database is initialized
       const initialized = await ensureDatabaseInitialized();
       
       if (!initialized) {
-        console.error('Не удалось инициализировать базу данных');
+        console.error('Failed to initialize database');
         return false;
       }
 
-      // Проверяем, что все необходимые таблицы существуют
+      // Check that all required tables exist
       const tables = [
         'whitelist_tokens',
         'admin_settings', 
         'airdrop_claims',
-        'admin_users',
         'installation_status'
       ];
 
@@ -58,25 +57,25 @@ export class InstallationService {
             .limit(1);
 
           if (error) {
-            console.error(`Проверка таблицы ${table} не удалась:`, error);
+            console.error(`Table ${table} check failed:`, error);
             return false;
           }
         } catch (error) {
-          console.error(`Ошибка при проверке таблицы ${table}:`, error);
+          console.error(`Error checking table ${table}:`, error);
           return false;
         }
       }
 
       return true;
     } catch (error) {
-      console.error('Установка не удалась:', error);
+      console.error('Installation failed:', error);
       return false;
     }
   }
 
   async completeInstallation(): Promise<boolean> {
     try {
-      // Убеждаемся, что база данных инициализирована
+      // Ensure database is initialized
       const initialized = await ensureDatabaseInitialized();
       
       if (!initialized) {
@@ -105,7 +104,7 @@ export class InstallationService {
 
   async resetInstallation(): Promise<boolean> {
     try {
-      // Убеждаемся, что база данных инициализирована
+      // Ensure database is initialized
       const initialized = await ensureDatabaseInitialized();
       
       if (!initialized) {

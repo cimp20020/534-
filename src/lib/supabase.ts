@@ -12,7 +12,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Простая инициализация базы данных при подключении
+// Simple database initialization on connection
 let initializationPromise: Promise<boolean> | null = null;
 let isInitialized = false;
 
@@ -24,7 +24,7 @@ export const ensureDatabaseInitialized = async (): Promise<boolean> => {
   if (!initializationPromise) {
     initializationPromise = (async () => {
       try {
-        // Динамический импорт для избежания циклических зависимостей
+        // Dynamic import to avoid circular dependencies
         const { databaseInitService } = await import('../services/database-init');
         const result = await databaseInitService.checkAndInitialize();
         if (result) {
@@ -32,7 +32,7 @@ export const ensureDatabaseInitialized = async (): Promise<boolean> => {
         }
         return result;
       } catch (error) {
-        console.error('Ошибка инициализации базы данных:', error);
+        console.error('Database initialization error:', error);
         return false;
       }
     })();
@@ -44,31 +44,6 @@ export const ensureDatabaseInitialized = async (): Promise<boolean> => {
 export type Database = {
   public: {
     Tables: {
-      admin_users: {
-        Row: {
-          id: string;
-          email: string;
-          role: 'admin' | 'user';
-          is_active: boolean;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id: string;
-          email: string;
-          role?: 'admin' | 'user';
-          is_active?: boolean;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          email?: string;
-          role?: 'admin' | 'user';
-          is_active?: boolean;
-          updated_at?: string;
-        };
-      };
       whitelist_tokens: {
         Row: {
           id: string;

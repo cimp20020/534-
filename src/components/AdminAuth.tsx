@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
-import { Shield, Eye, EyeOff, UserPlus, LogIn, Sparkles } from 'lucide-react';
+import { Shield, Eye, EyeOff, LogIn, Sparkles, User, Lock } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 const AdminAuth: React.FC = () => {
-  const { signUp, signIn } = useAuth();
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [email, setEmail] = useState('');
+  const { signIn } = useAuth();
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -17,16 +15,8 @@ const AdminAuth: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    if (isSignUp && password !== confirmPassword) {
-      setError('Passwords do not match');
-      setLoading(false);
-      return;
-    }
-
     try {
-      const { error } = isSignUp 
-        ? await signUp(email, password)
-        : await signIn(email, password);
+      const { error } = await signIn(username, password);
 
       if (error) {
         setError(error.message);
@@ -54,30 +44,30 @@ const AdminAuth: React.FC = () => {
               <Shield className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-white mb-2">
-              {isSignUp ? 'Create Admin Account' : 'Admin Login'}
+              Admin Login
             </h1>
             <p className="text-gray-400 text-sm">
-              {isSignUp 
-                ? 'Set up your administrator account to manage the platform'
-                : 'Access the admin panel to manage airdrops and settings'
-              }
+              Access the admin panel to manage airdrops and settings
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
-                Email Address
+              <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-2">
+                Username
               </label>
-              <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                placeholder="admin@example.com"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  id="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 pl-12 bg-gray-700/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+                  placeholder="Enter username"
+                />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              </div>
             </div>
 
             <div>
@@ -91,9 +81,10 @@ const AdminAuth: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full px-4 py-3 pr-12 bg-gray-700/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                  placeholder="Enter your password"
+                  className="w-full px-4 py-3 pl-12 pr-12 bg-gray-700/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+                  placeholder="Enter password"
                 />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
@@ -103,23 +94,6 @@ const AdminAuth: React.FC = () => {
                 </button>
               </div>
             </div>
-
-            {isSignUp && (
-              <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-2">
-                  Confirm Password
-                </label>
-                <input
-                  type="password"
-                  id="confirmPassword"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                  placeholder="Confirm your password"
-                />
-              </div>
-            )}
 
             {error && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
@@ -136,38 +110,25 @@ const AdminAuth: React.FC = () => {
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <>
-                  {isSignUp ? <UserPlus className="w-5 h-5" /> : <LogIn className="w-5 h-5" />}
-                  {isSignUp ? 'Create Account' : 'Sign In'}
+                  <LogIn className="w-5 h-5" />
+                  Sign In
                 </>
               )}
             </button>
           </form>
 
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-purple-400 hover:text-purple-300 text-sm font-medium transition-colors"
-            >
-              {isSignUp 
-                ? 'Already have an account? Sign in'
-                : 'Need to create an admin account? Sign up'
-              }
-            </button>
-          </div>
-
-          {isSignUp && (
-            <div className="mt-6 bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
-              <div className="flex items-start gap-3">
-                <Sparkles className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-blue-400 text-sm font-medium mb-1">First Time Setup</p>
-                  <p className="text-blue-300 text-xs">
-                    This will be your main administrator account. Make sure to use a secure password and keep your credentials safe.
-                  </p>
-                </div>
+          <div className="mt-6 bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <Sparkles className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-blue-400 text-sm font-medium mb-1">Default Credentials</p>
+                <p className="text-blue-300 text-xs">
+                  Username: <code className="bg-blue-500/20 px-1 rounded">admin</code><br />
+                  Password: <code className="bg-blue-500/20 px-1 rounded">admin</code>
+                </p>
               </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

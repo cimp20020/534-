@@ -4,14 +4,12 @@ import { WhitelistToken } from '../types';
 import { airdropService } from '../services/airdrop';
 import { ethplorerService } from '../services/ethplorer';
 import { databaseService } from '../services/database';
-import { adminService, AdminUser } from '../services/admin';
 import { useAuth } from '../hooks/useAuth';
 
 const AdminPanel: React.FC = () => {
-  const { signOut, adminUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<'whitelist' | 'settings' | 'analytics' | 'users'>('whitelist');
+  const { signOut, user } = useAuth();
+  const [activeTab, setActiveTab] = useState<'whitelist' | 'settings' | 'analytics'>('whitelist');
   const [whitelist, setWhitelist] = useState<WhitelistToken[]>([]);
-  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [apiKey, setApiKey] = useState('freekey');
   const [showApiKey, setShowApiKey] = useState(false);
   const [statistics, setStatistics] = useState<any>({});
@@ -33,17 +31,15 @@ const AdminPanel: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [whitelistData, savedApiKey, stats, users] = await Promise.all([
+      const [whitelistData, savedApiKey, stats] = await Promise.all([
         airdropService.getWhitelist(),
         databaseService.getSetting('ethplorer_api_key'),
         databaseService.getStatistics(),
-        adminService.getAllAdminUsers(),
       ]);
 
       setWhitelist(whitelistData);
       if (savedApiKey) setApiKey(savedApiKey);
       setStatistics(stats);
-      setAdminUsers(users);
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -90,16 +86,6 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  const handleToggleAdminUser = async (id: string, currentStatus: boolean) => {
-    const success = currentStatus 
-      ? await adminService.deactivateAdminUser(id)
-      : await adminService.activateAdminUser(id);
-    
-    if (success) {
-      await loadData();
-    }
-  };
-
   const handleSaveApiKey = async () => {
     await ethplorerService.setApiKey(apiKey);
     alert('API key updated successfully!');
@@ -135,7 +121,7 @@ const AdminPanel: React.FC = () => {
                 <div>
                   <h1 className="text-2xl font-bold text-white">Admin Panel</h1>
                   <p className="text-gray-400">
-                    Welcome, {adminUser?.email} • Role: {adminUser?.role}
+                    Welcome, {user?.username} • Role: {user?.role}
                   </p>
                 </div>
               </div>
@@ -169,16 +155,6 @@ const AdminPanel: React.FC = () => {
                 }`}
               >
                 API Settings
-              </button>
-              <button
-                onClick={() => setActiveTab('users')}
-                className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  activeTab === 'users'
-                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/25'
-                    : 'text-gray-400 hover:text-gray-300'
-                }`}
-              >
-                Admin Users
               </button>
               <button
                 onClick={() => setActiveTab('analytics')}
@@ -341,80 +317,6 @@ const AdminPanel: React.FC = () => {
                       Save
                     </button>
                   </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'users' && (
-              <div className="space-y-6">
-                <h3 className="font-semibold text-white mb-4">Administrator Users ({adminUsers.length} users)</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b border-gray-700">
-                        <th className="text-left py-3 px-4 font-semibold text-gray-300">User</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-300">Role</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-300">Status</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-300">Created</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-300">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {adminUsers.map((user) => (
-                        <tr key={user.id} className="border-b border-gray-700/50 hover:bg-gray-700/20">
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
-                                <Shield className="w-4 h-4 text-white" />
-                              </div>
-                              <div>
-                                <p className="font-medium text-white">{user.email}</p>
-                                <p className="text-sm text-gray-400">ID: {user.id.slice(0, 8)}...</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                              user.role === 'admin' 
-                                ? 'bg-purple-500/20 text-purple-400'
-                                : 'bg-gray-500/20 text-gray-400'
-                            }`}>
-                              {user.role}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4">
-                            <button
-                              onClick={() => handleToggleAdminUser(user.id, user.is_active)}
-                              className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                user.is_active
-                                  ? 'bg-emerald-500/20 text-emerald-400'
-                                  : 'bg-red-500/20 text-red-400'
-                              }`}
-                            >
-                              {user.is_active ? 'Active' : 'Inactive'}
-                            </button>
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="text-sm text-gray-400">
-                              {new Date(user.created_at).toLocaleDateString()}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4">
-                            <button
-                              onClick={() => handleToggleAdminUser(user.id, user.is_active)}
-                              className={`text-sm px-3 py-1 rounded transition-colors ${
-                                user.is_active
-                                  ? 'text-red-400 hover:text-red-300'
-                                  : 'text-emerald-400 hover:text-emerald-300'
-                              }`}
-                            >
-                              {user.is_active ? 'Deactivate' : 'Activate'}
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
                 </div>
               </div>
             )}
