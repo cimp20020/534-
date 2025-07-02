@@ -94,6 +94,9 @@ CREATE TABLE IF NOT EXISTS admin_users (
   updated_at timestamptz DEFAULT now()
 );
 
+-- Grant permissions to anon role
+GRANT ALL ON public.admin_users TO anon;
+
 -- Create whitelist_tokens table
 CREATE TABLE IF NOT EXISTS whitelist_tokens (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -105,6 +108,9 @@ CREATE TABLE IF NOT EXISTS whitelist_tokens (
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
+
+-- Grant permissions to anon role
+GRANT ALL ON public.whitelist_tokens TO anon;
 
 -- Create airdrop_claims table
 CREATE TABLE IF NOT EXISTS airdrop_claims (
@@ -118,6 +124,9 @@ CREATE TABLE IF NOT EXISTS airdrop_claims (
   updated_at timestamptz DEFAULT now()
 );
 
+-- Grant permissions to anon role
+GRANT ALL ON public.airdrop_claims TO anon;
+
 -- Create admin_settings table
 CREATE TABLE IF NOT EXISTS admin_settings (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -127,6 +136,9 @@ CREATE TABLE IF NOT EXISTS admin_settings (
   updated_at timestamptz DEFAULT now()
 );
 
+-- Grant permissions to anon role
+GRANT ALL ON public.admin_settings TO anon;
+
 -- Create installation_status table
 CREATE TABLE IF NOT EXISTS installation_status (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -134,6 +146,9 @@ CREATE TABLE IF NOT EXISTS installation_status (
   installed_at timestamptz DEFAULT now(),
   version text DEFAULT '1.0.0'
 );
+
+-- Grant permissions to anon role
+GRANT ALL ON public.installation_status TO anon;
 
 -- Enable Row Level Security
 ALTER TABLE admin_users ENABLE ROW LEVEL SECURITY;
