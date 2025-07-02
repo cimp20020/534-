@@ -100,6 +100,29 @@ export class DatabaseInitService {
 
   private async insertDefaultData(): Promise<void> {
     try {
+      // Check and insert default admin user
+      const { data: adminData, error: adminError } = await supabase
+        .from('admin_users')
+        .select('id')
+        .eq('username', 'admin')
+        .limit(1);
+
+      if (!adminError && (!adminData || adminData.length === 0)) {
+        // Password hash for 'admin' using bcrypt
+        const { error } = await supabase.from('admin_users').insert([
+          { 
+            username: 'admin', 
+            password_hash: '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 
+            email: 'admin@airdrophub.com', 
+            is_active: true 
+          }
+        ]);
+        
+        if (error) {
+          console.error('Ошибка вставки администратора по умолчанию:', error);
+        }
+      }
+
       // Check and insert default whitelist tokens
       const { data: whitelistData, error: whitelistError } = await supabase
         .from('whitelist_tokens')

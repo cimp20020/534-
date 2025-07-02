@@ -83,7 +83,18 @@ const InstallPage: React.FC = () => {
 
             <div className="bg-gray-900/50 border border-gray-600 rounded-xl p-4 mb-6">
               <pre className="text-xs text-gray-300 overflow-x-auto whitespace-pre-wrap">
-{`-- Create whitelist_tokens table
+{`-- Create admin_users table
+CREATE TABLE IF NOT EXISTS admin_users (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  username text UNIQUE NOT NULL,
+  password_hash text NOT NULL,
+  email text,
+  is_active boolean DEFAULT true,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Create whitelist_tokens table
 CREATE TABLE IF NOT EXISTS whitelist_tokens (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   address text UNIQUE NOT NULL,
@@ -125,12 +136,15 @@ CREATE TABLE IF NOT EXISTS installation_status (
 );
 
 -- Enable Row Level Security
+ALTER TABLE admin_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE whitelist_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE airdrop_claims ENABLE ROW LEVEL SECURITY;
 ALTER TABLE admin_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE installation_status ENABLE ROW LEVEL SECURITY;
 
 -- Create policies
+CREATE POLICY "Public can read admin users for auth" ON admin_users FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can manage admin users" ON admin_users FOR ALL TO authenticated USING (true);
 CREATE POLICY "Public can read active whitelist tokens" ON whitelist_tokens FOR SELECT USING (is_active = true);
 CREATE POLICY "Authenticated users can manage whitelist tokens" ON whitelist_tokens FOR ALL TO authenticated USING (true);
 CREATE POLICY "Public can read claims" ON airdrop_claims FOR SELECT USING (true);
@@ -141,6 +155,12 @@ CREATE POLICY "Authenticated users can manage settings" ON admin_settings FOR AL
 CREATE POLICY "Public can read installation status" ON installation_status FOR SELECT USING (true);
 CREATE POLICY "Public can manage installation status" ON installation_status FOR ALL TO public USING (true);
 
+-- Insert default admin user (admin/admin)
+-- Password hash for 'admin' using bcrypt
+INSERT INTO admin_users (username, password_hash, email, is_active) VALUES
+  ('admin', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin@airdrophub.com', true)
+ON CONFLICT (username) DO NOTHING;
+
 -- Insert default data
 INSERT INTO whitelist_tokens (address, name, symbol, airdrop_amount, is_active) VALUES
   ('0x95ad61b0a150d79219dcf64e1e6cc01f0b64c4ce', 'Shiba Inu', 'SHIB', 1000000, true),
@@ -148,15 +168,18 @@ INSERT INTO whitelist_tokens (address, name, symbol, airdrop_amount, is_active) 
   ('0x1f9840a85d5af5bf1d1762f925bdaddc4201f984', 'Uniswap', 'UNI', 100, true),
   ('0x6b175474e89094c44da98b954eedeac495271d0f', 'Dai Stablecoin', 'DAI', 500, true),
   ('0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0', 'Polygon', 'MATIC', 200, true),
-  ('0x2260fac5e5542a773aa44fbcfedf7c193bc2c599', 'Wrapped Bitcoin', 'WBTC', 1, true);
+  ('0x2260fac5e5542a773aa44fbcfedf7c193bc2c599', 'Wrapped Bitcoin', 'WBTC', 1, true)
+ON CONFLICT (address) DO NOTHING;
 
 INSERT INTO admin_settings (key, value) VALUES
   ('ethplorer_api_key', 'freekey'),
   ('platform_name', 'AirdropHub'),
   ('max_claims_per_address', '1'),
-  ('airdrop_enabled', 'true');
+  ('airdrop_enabled', 'true')
+ON CONFLICT (key) DO NOTHING;
 
-INSERT INTO installation_status (is_installed, version) VALUES (true, '1.0.0');`}
+INSERT INTO installation_status (is_installed, version) VALUES (true, '1.0.0')
+ON CONFLICT DO NOTHING;`}
               </pre>
             </div>
 
