@@ -77,6 +77,10 @@ export class DatabaseService {
     }
   }
 
+  async updateToken(id: string, updates: Partial<WhitelistToken>): Promise<boolean> {
+    return this.updateWhitelistToken(id, updates);
+  }
+
   async removeFromWhitelist(id: string): Promise<boolean> {
     try {
       const { error } = await supabase
@@ -142,6 +146,10 @@ export class DatabaseService {
     }
   }
 
+  async getClaims(): Promise<any[]> {
+    return this.getAirdropClaims();
+  }
+
   async hasClaimedAirdrop(walletAddress: string): Promise<boolean> {
     try {
       const { data, error } = await supabase
@@ -203,6 +211,29 @@ export class DatabaseService {
     } catch (error) {
       console.error('Error fetching setting:', error);
       return null;
+    }
+  }
+
+  async getSettings(): Promise<any> {
+    try {
+      const { data, error } = await supabase
+        .from('admin_settings')
+        .select('key, value');
+
+      if (error) {
+        console.error('Error fetching settings:', error);
+        return {};
+      }
+
+      const settings: any = {};
+      data.forEach(item => {
+        settings[item.key] = item.value;
+      });
+
+      return settings;
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+      return {};
     }
   }
 

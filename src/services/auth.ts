@@ -76,6 +76,22 @@ export class AuthService {
   getCurrentUser(): AdminSession | null {
     return this.getCurrentSession();
   }
+
+  // Simple login method for compatibility
+  async login(username: string, password: string): Promise<boolean> {
+    const result = await this.signIn(username, password);
+    if (result.success) {
+      localStorage.setItem('admin_token', 'authenticated');
+      return true;
+    }
+    return false;
+  }
+
+  // Simple logout method for compatibility
+  logout(): void {
+    localStorage.removeItem('admin_token');
+    this.signOut();
+  }
 }
 
 export const authService = new AuthService();

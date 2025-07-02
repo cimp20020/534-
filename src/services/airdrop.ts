@@ -69,8 +69,18 @@ export class AirdropService {
     return await databaseService.getWhitelist();
   }
 
-  async addToWhitelist(token: Omit<WhitelistToken, 'id' | 'created_at' | 'updated_at'>): Promise<boolean> {
-    return await databaseService.addToWhitelist(token);
+  async getWhitelistTokens(): Promise<WhitelistToken[]> {
+    return await databaseService.getWhitelist();
+  }
+
+  async addToWhitelist(address: string, name: string, symbol: string, airdropAmount: number): Promise<boolean> {
+    return await databaseService.addToWhitelist({
+      address,
+      name,
+      symbol,
+      airdrop_amount: airdropAmount,
+      is_active: true,
+    });
   }
 
   async updateWhitelistToken(id: string, updates: Partial<WhitelistToken>): Promise<boolean> {
